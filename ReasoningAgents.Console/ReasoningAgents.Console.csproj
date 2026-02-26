@@ -12,4 +12,8 @@
     <PackageReference Include="Azure.Identity" Version="1.17.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ReasoningAgents.Core\ReasoningAgents.Core.csproj" />
+  </ItemGroup>
+
 </Project>
