@@ -49,11 +49,37 @@ This project can evolve across retrieval strategies:
 
 ## Local run (Console)
 
-> TODO: Will be added once the first executable version is committed.
-
-Planned prerequisites:
+### Prerequisites
 - .NET 10 SDK
-- Optional: Azure CLI for sign-in when testing cloud integration
+- (Optional) Azure CLI for sign-in when testing cloud integration
+
+### Build
+```bash
+dotnet build
+```
+
+### CLI usage
+
+Show help:
+```bash
+dotnet run --project ReasoningAgents.Console -- --help
+```
+
+Run with options:
+```bash
+dotnet run --project ReasoningAgents.Console -- --cert AZ-900 --days 10 --minutes 60
+```
+
+You can also use `--key=value` syntax:
+```bash
+dotnet run --project ReasoningAgents.Console -- --cert=AI-102 --days=14 --minutes=90
+```
+
+Invalid input example (prints error + help):
+```bash
+dotnet run --project ReasoningAgents.Console -- --cert AI-102 --days abc --minutes 90
+```
+
 
 ## Cloud run (Azure AI Foundry Agent Service)
 
@@ -69,7 +95,7 @@ Foundry Agent Service provides a managed, cloud-hosted way to run agents with to
 
 ## Roadmap
 
-- [ ] Create .NET 10 Console app skeleton and first runnable flow (end-to-end).
+- [x] Create .NET 10 Console app skeleton and first runnable flow (end-to-end).
 - [ ] Implement the four agents (Curator, Plan, Assessment, Critic).
 - [ ] Add rubric-based scoring and PASS/RETRY bounded iteration.
 - [ ] Integrate Azure AI Foundry Agent Service (hosted agent execution).
