@@ -1,14 +1,26 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using ReasoningAgents.Console.Cli;
 using ReasoningAgents.Core.Agents;
 using ReasoningAgents.Core.Models;
 using ReasoningAgents.Core.Orchestration;
 
-var goal = new CertificationGoal(
-    CertificationCode: "AI-102",
-    DaysAvailable: 14,
-    DailyMinutes: 90
-);
+var parse = CliOptionsParser.Parse(args);
+
+if (!parse.Success)
+{
+    if (!string.IsNullOrWhiteSpace(parse.Error))
+        Console.WriteLine($"Error: {parse.Error}\n");
+
+    if (parse.ShowHelp)
+        CliHelpPrinter.Print();
+
+    Environment.ExitCode = string.IsNullOrWhiteSpace(parse.Error) ? 0 : 1;
+    return;
+}
+
+var opt = parse.Options!;
+var goal = new CertificationGoal(opt.Cert, opt.Days, opt.Minutes);
 
 // Temporary in-memory agent implementations (MVP).
 IAgentStep<CertificationGoal, string> curator = new StubCuratorAgent();
