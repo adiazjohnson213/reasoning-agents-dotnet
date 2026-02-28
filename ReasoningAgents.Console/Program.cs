@@ -1,8 +1,12 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using ReasoningAgents.Console.Agents;
 using ReasoningAgents.Console.Cli;
+using ReasoningAgents.Console.Foundry;
 using ReasoningAgents.Core.Agents;
+using ReasoningAgents.Core.Common;
 using ReasoningAgents.Core.Models;
 using ReasoningAgents.Core.Orchestration;
 
@@ -20,13 +24,36 @@ if (!parse.Success)
     return;
 }
 
+var config = new ConfigurationBuilder()
+    .AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+var agentOptions = config.GetSection("Agent").Get<AgentOptions>();
+if (agentOptions is null ||
+    string.IsNullOrWhiteSpace(agentOptions.ProjectEndpoint) ||
+    string.IsNullOrWhiteSpace(agentOptions.DeploymentName))
+{
+    Console.WriteLine(
+        "Error: Missing Agent configuration. Set User Secrets (Agent:ProjectEndpoint, Agent:DeploymentName)");
+    Environment.ExitCode = 1;
+    return;
+}
+
+
 var opt = parse.Options!;
 var goal = new CertificationGoal(opt.Cert, opt.Days, opt.Minutes);
 
+var persistenClient = new FoundryClientFactory().Create(agentOptions);
+
+var domainAssessor = new FoundryAssessmentAgent(agentOptions, persistenClient);
+
 IAgentStep<CertificationGoal, string> curator = new StubCuratorAgent();
 IAgentStep<(CertificationGoal, string), string> planner = new StubPlannerAgent();
-IAgentStep<(CertificationGoal, string), string> assessor = new StubAssessmentAgent();
-IAgentStep<(CertificationGoal, string, string), (bool, string)> critic = new StubCriticAgent();
+IAgentStep<(CertificationGoal, string), string> assessor = !opt.IsExamMode
+                                                                ? domainAssessor
+                                                                : new FoundryExamAssessmentAgent(domainAssessor);
+IAgentStep<(CertificationGoal, string, string), (bool, string)> critic = new FoundryCriticAgent(agentOptions, persistenClient);
 
 var runner = new WorkflowRunner(curator, planner, assessor, critic);
 
@@ -41,7 +68,7 @@ var result = await runner.RunAsync(
         Console.WriteLine("\nPaste your answers and press Enter:");
         return await Task.Run(() => Console.ReadLine() ?? string.Empty, ct);
     },
-    maxIterations: 2,
+    maxIterations: 1,
     ct: CancellationToken.None
 );
 

@@ -1,57 +1,44 @@
 # reasoning-agents-dotnet
 
-A **.NET 10** console application that builds a **multi-agent** study assistant for Microsoft certifications.  
-It generates a learning path, turns it into a time-boxed study plan, creates assessments, grades results using a rubric, and iterates until the learner is ready.
+A **.NET 10** console application that helps you study for Microsoft certifications by generating practice assessments and grading your answers using **Azure AI Foundry Agent Service (Persistent Agents)**.
 
-The system runs **locally** using **Microsoft Agent Framework** and can also run in the cloud using **Azure AI Foundry Agent Service** for a production-ready hosted agent experience. :contentReference[oaicite:1]{index=1}
+The app supports two assessment modes:
+- **Quick mode** (small set of questions)
+- **Exam mode** (**50 questions**) distributed by domain using the AI-102 study guide weighting ranges (implemented as a fixed, valid split).
 
-## What this project does
+## Current status
 
-Given a target certification (e.g., AI-102) and a time window, the app will:
+✅ Implemented:
+- CLI parsing (`--cert`, `--days`, `--minutes`, `--exam true/false`)
+- Foundry **Assessment** agent:
+  - Generates **MCQ** questions by **domain + count**
+- Foundry **Critic** agent:
+  - Grades the user's answers and returns **JSON** (parsed into pass/fail + summary)
+- Exam mode orchestration:
+  - Generates **50 questions** using a blueprint (domain → count)
 
-1. **Curate a learning path** from trusted sources (docs / learning resources).
-2. **Generate a study plan** with milestones and clear outcomes.
-3. **Create an assessment** (practice questions + expected answers + explanations).
-4. **Evaluate performance** using a rubric (scoring + feedback).
-5. **Decide PASS/RETRY** and refine the plan if needed (bounded iteration).
+🚧 In progress / next:
+- Replace stub Curator/Planner with real implementations (currently stubs)
+- Improve question display (hide any answer/explanation text if the model returns it)
+- Add automated persistence guidance for agent IDs (currently stored manually in User Secrets)
 
-## Reasoning approach (multi-agent)
+## How it works
 
-This project explicitly uses multi-agent reasoning patterns:
+High-level flow:
+1) Build a study plan (currently stub)
+2) Generate an assessment:
+   - quick: `FoundryAssessmentAgent`
+   - exam: `FoundryExamAssessmentAgent` (blueprint)
+3) You answer in the console
+4) `FoundryCriticAgent` evaluates your answers and returns pass/fail + feedback
 
-- **Planner–Executor**: create a step plan first, then execute it step-by-step.
-- **Critic/Verifier**: a separate agent validates quality, consistency, and scoring.
-- **Bounded Iteration**: controlled retries with explicit changes (max N loops).
-
-Microsoft Agent Framework supports building AI agents and multi-agent workflows in .NET, including orchestration patterns and production-grade capabilities. :contentReference[oaicite:2]{index=2}
-
-## Agents (roles)
-
-- **LearningPathCuratorAgent**  
-  Selects and structures learning resources into a coherent path.
-
-- **StudyPlanGeneratorAgent**  
-  Produces a day-by-day (or week-by-week) plan with milestones and checkpoints.
-
-- **AssessmentAgent**  
-  Generates practice questions aligned to the plan and the selected resources.
-
-- **CriticAgent**  
-  Grades answers using a rubric, provides feedback, and decides whether to iterate.
-
-## Knowledge / Retrieval (options)
-
-This project can evolve across retrieval strategies:
-
-- **MVP**: curated list of URLs + lightweight extraction.
-- **Learn MCP (optional)**: connect to the **Microsoft Learn MCP Server** for trusted, up-to-date documentation retrieval via the MCP endpoint (`https://learn.microsoft.com/api/mcp`). :contentReference[oaicite:3]{index=3}
-- **Enterprise (optional)**: index curated content in **Azure AI Search** and ground responses from it (later step).
+Azure AI Foundry Agent Service uses a **thread → run → messages** model for executing agents.
 
 ## Local run (Console)
 
 ### Prerequisites
 - .NET 10 SDK
-- (Optional) Azure CLI for sign-in when testing cloud integration
+- Azure CLI logged in (`az login`) or any valid `DefaultAzureCredential` flow
 
 ### Build
 ```bash
@@ -65,39 +52,48 @@ Show help:
 dotnet run --project ReasoningAgents.Console -- --help
 ```
 
-Run with options:
+Quick mode:
 ```bash
-dotnet run --project ReasoningAgents.Console -- --cert AZ-900 --days 10 --minutes 60
+dotnet run --project ReasoningAgents.Console -- --cert=AI-102 --days=14 --minutes=90 --exam=false
 ```
 
-You can also use `--key=value` syntax:
+Exam mode (50 questions):
 ```bash
-dotnet run --project ReasoningAgents.Console -- --cert=AI-102 --days=14 --minutes=90
+dotnet run --project ReasoningAgents.Console -- --cert=AI-102 --days=14 --minutes=90 --exam=true
 ```
 
-Invalid input example (prints error + help):
-```bash
-dotnet run --project ReasoningAgents.Console -- --cert AI-102 --days abc --minutes 90
+## Configuration (User Secrets or env vars)
+
+This project uses **Azure AI Foundry project endpoint** + model deployment name.
+
+Project endpoint format:
+`https://<aiservices-id>.services.ai.azure.com/api/projects/<project-name>`
+
+### User Secrets (recommended for local dev)
+Set these keys (schema only; do not commit secrets):
+
+```json
+{
+  "Agent": {
+    "ProjectEndpoint": "https://<aiservices-id>.services.ai.azure.com/api/projects/<project-name>",
+    "DeploymentName": "<model-deployment-name>",
+    "AssessmentAgentId": "<optional existing agent id>",
+    "CriticAgentId": "<optional existing agent id>"
+  }
+}
 ```
-
-
-## Cloud run (Azure AI Foundry Agent Service)
-
-> TODO: Will be added once the Foundry integration is implemented.
-
-Foundry Agent Service provides a managed, cloud-hosted way to run agents with tools and enterprise-ready foundations. :contentReference[oaicite:4]{index=4}
 
 ## Security
-
-- No secrets committed (keys, tokens, connection strings).
-- Prefer `DefaultAzureCredential` for local development and Managed Identity in cloud environments.
-- Environment-specific values should be provided via environment variables (or local user secrets).
+- No secrets committed (keys/tokens/connection strings).
+- Use `DefaultAzureCredential` locally; use managed identity in cloud scenarios.
 
 ## Roadmap
 
 - [x] Create .NET 10 Console app skeleton and first runnable flow (end-to-end).
-- [ ] Implement the four agents (Curator, Plan, Assessment, Critic).
-- [ ] Add rubric-based scoring and PASS/RETRY bounded iteration.
-- [ ] Integrate Azure AI Foundry Agent Service (hosted agent execution).
-- [ ] Optional: Learn MCP retrieval integration.
-- [ ] Optional: Telemetry and evaluation harness.
+- [x] Implement Foundry assessment generation (MCQ by domain + count).
+- [x] Implement Foundry critic evaluation (JSON output + parsing).
+- [x] Add exam mode (50 questions) using a blueprint.
+- [ ] Replace stub Curator/Planner with real implementations.
+- [ ] Improve assessment display (ensure answer/explanation is hidden from the user if present).
+- [ ] Add lightweight unit tests for CLI parsing.
+- [ ] Add telemetry / evaluation harness (optional).

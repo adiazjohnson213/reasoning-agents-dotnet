@@ -13,8 +13,9 @@
 
             string cert = "";
             int days = 0, minutes = 0;
+            bool exam = false;
 
-            bool seenCert = false, seenDays = false, seenMinutes = false;
+            bool seenCert = false, seenDays = false, seenMinutes = false, seenExam = false;
 
             for (int i = 0; i < tokens.Count; i++)
             {
@@ -41,6 +42,12 @@
                         if (minutes <= 0) return Fail("Invalid value for --minutes. Must be a positive integer.");
                         seenMinutes = true;
                         break;
+                    case "--exam":
+                        if (seenExam) return Fail("Duplicate option --exam.");
+                        if (!TryReadBool(tokens, ref i, "--exam", out exam, out var err4))
+                            return Fail(err4);
+                        seenExam = true;
+                        break;
 
                     default:
                         return Fail($"Unknown option: {token}");
@@ -53,7 +60,7 @@
 
             return new CliParseResult(
                 Success: true,
-                Options: new CliOptions(cert, days, minutes),
+                Options: new CliOptions(cert, days, minutes, exam),
                 ShowHelp: false,
                 Error: null
             );
@@ -111,6 +118,26 @@
             if (!int.TryParse(raw, out value))
             {
                 error = $"Invalid value for {optionName}. Must be a positive integer.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryReadBool(List<string> tokens,
+                                        ref int i,
+                                        string optionName,
+                                        out bool value,
+                                        out string error)
+        {
+            value = false;
+
+            if (!TryReadValue(tokens, ref i, optionName, out var raw, out error))
+                return false;
+
+            if (!bool.TryParse(raw, out value))
+            {
+                error = $"Invalid value for {optionName}. Must be true or false.";
                 return false;
             }
 
