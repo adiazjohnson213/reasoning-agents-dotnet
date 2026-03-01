@@ -98,12 +98,11 @@ namespace ReasoningAgents.Console.Foundry
 
         private string ReadLastAgentTextForRun(string threadId, string runId, CancellationToken ct)
         {
-            Pageable<PersistentThreadMessage> messages = _client.Messages.GetMessages(
-                threadId: threadId,
-                runId: runId,
-                limit: 20,
-                order: ListSortOrder.Descending,
-                cancellationToken: ct);
+            Pageable<PersistentThreadMessage> messages = _client.Messages.GetMessages(threadId: threadId,
+                                                                                      runId: runId,
+                                                                                      limit: 20,
+                                                                                      order: ListSortOrder.Descending,
+                                                                                      cancellationToken: ct);
 
             foreach (var msg in messages)
             {

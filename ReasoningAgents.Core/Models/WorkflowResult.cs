@@ -3,6 +3,8 @@
     public sealed record WorkflowResult(
         bool Passed,
         string Summary,
-        int Iterations
+        int Iterations,
+        string? LearningPath = null,
+        string? StudyPlan = null
     );
 }

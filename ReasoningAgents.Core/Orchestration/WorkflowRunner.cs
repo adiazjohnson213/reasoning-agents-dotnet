@@ -58,7 +58,9 @@ namespace ReasoningAgents.Core.Orchestration
                     return new WorkflowResult(
                         Passed: true,
                         Summary: summary,
-                        Iterations: iterations
+                        Iterations: iterations,
+                        LearningPath: learningPath,
+                        StudyPlan: studyPlan
                     );
                 }
 
@@ -76,7 +78,9 @@ namespace ReasoningAgents.Core.Orchestration
                     return new WorkflowResult(
                         Passed: false,
                         Summary: $"Failed after {iterations} iteration(s). Last evaluation: {summary}",
-                        Iterations: iterations
+                        Iterations: iterations,
+                        LearningPath: learningPath,
+                        StudyPlan: studyPlan
                     );
                 }
 
