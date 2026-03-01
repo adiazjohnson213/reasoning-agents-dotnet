@@ -5,15 +5,16 @@ namespace ReasoningAgents.Core.Orchestration
 {
     public sealed class WorkflowRunner
     {
-        private readonly IAgentStep<CertificationGoal, string> _curator;
+        private readonly IAgentStep<(CertificationGoal Goal, string PerformanceJson), string> _curator;
         private readonly IAgentStep<(CertificationGoal Goal, string LearningPath), string> _planner;
         private readonly IAgentStep<(CertificationGoal Goal, string StudyPlan), string> _assessor;
         private readonly IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)> _critic;
 
-        public WorkflowRunner(IAgentStep<CertificationGoal, string> curator,
-                              IAgentStep<(CertificationGoal, string), string> planner,
-                              IAgentStep<(CertificationGoal, string), string> assessor,
-                              IAgentStep<(CertificationGoal, string, string), (bool, string)> critic)
+        public WorkflowRunner(
+            IAgentStep<(CertificationGoal Goal, string PerformanceJson), string> curator,
+            IAgentStep<(CertificationGoal Goal, string LearningPath), string> planner,
+            IAgentStep<(CertificationGoal Goal, string StudyPlan), string> assessor,
+            IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)> critic)
         {
             _curator = curator;
             _planner = planner;
@@ -21,30 +22,28 @@ namespace ReasoningAgents.Core.Orchestration
             _critic = critic;
         }
 
-        public async Task<WorkflowResult> RunAsync(CertificationGoal goal,
-                                                   Func<string, CancellationToken, Task<string>> getUserAnswersAsync,
-                                                   int maxIterations,
-                                                   CancellationToken ct)
+        public async Task<WorkflowResult> RunAsync(
+            CertificationGoal goal,
+            Func<string, CancellationToken, Task<string>> getUserAnswersAsync,
+            int maxIterations,
+            CancellationToken ct)
         {
             var iterations = 0;
 
-            // 1) Curate
-            var learningPath = await _curator.ExecuteAsync(goal, ct);
-
-            // 2) Plan
-            var studyPlan = await _planner.ExecuteAsync((goal, learningPath), ct);
+            string learningPath = "";
+            string studyPlan = "";
 
             while (true)
             {
                 iterations++;
 
-                // 3) Assess
+                // 1) Assess
                 var assessment = await _assessor.ExecuteAsync((goal, studyPlan), ct);
 
-                // 4) Human-in-the-loop: user answers
+                // 2) User answers
                 var userAnswers = await getUserAnswersAsync(assessment, ct);
 
-                // 5) Critic (PASS/RETRY)
+                // 3) Critic
                 var (passed, summary) = await _critic.ExecuteAsync((goal, assessment, userAnswers), ct);
 
                 if (passed)
@@ -56,6 +55,15 @@ namespace ReasoningAgents.Core.Orchestration
                     );
                 }
 
+                // 4) Curate + Plan ALWAYS on failure (even on last iteration)
+                var performanceBlob =
+                    $"[PERFORMANCE_FEEDBACK]\n{summary}\n\n" +
+                    $"[LAST_ASSESSMENT]\n{assessment}";
+
+                learningPath = await _curator.ExecuteAsync((goal, performanceBlob), ct);
+                studyPlan = await _planner.ExecuteAsync((goal, learningPath), ct);
+
+                // 5) Now decide whether we can iterate again
                 if (iterations >= maxIterations)
                 {
                     return new WorkflowResult(
@@ -65,9 +73,7 @@ namespace ReasoningAgents.Core.Orchestration
                     );
                 }
 
-                // 6) Iterate: refine the plan based on critique (simple MVP behavior)
-                // Later: replace this with a dedicated "PlanRefinerAgent".
-                studyPlan = $"{studyPlan}\n\n[REFINEMENT]\nFocus more on the weak areas identified:\n{summary}";
+                // Loop continues with improved studyPlan
             }
         }
     }

@@ -40,6 +40,13 @@ if (agentOptions is null ||
     return;
 }
 
+var handler = new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+};
+
+var http = new HttpClient(handler, disposeHandler: true);
+
 
 var opt = parse.Options!;
 var goal = new CertificationGoal(opt.Cert, opt.Days, opt.Minutes);
@@ -48,7 +55,7 @@ var persistenClient = new FoundryClientFactory().Create(agentOptions);
 
 var domainAssessor = new FoundryAssessmentAgent(agentOptions, persistenClient);
 
-IAgentStep<CertificationGoal, string> curator = new StubCuratorAgent();
+IAgentStep<(CertificationGoal, string), string> curator = new FoundryCuratorAgent(agentOptions, persistenClient, http);
 IAgentStep<(CertificationGoal, string), string> planner = new StubPlannerAgent();
 IAgentStep<(CertificationGoal, string), string> assessor = !opt.IsExamMode
                                                                 ? domainAssessor
@@ -74,4 +81,61 @@ var result = await runner.RunAsync(
 
 Console.WriteLine($"\nPASSED: {result.Passed}");
 Console.WriteLine($"ITERATIONS: {result.Iterations}");
-Console.WriteLine($"SUMMARY:\n{result.Summary}");
+Console.WriteLine();
+
+PrettyPrintSummary(result.Summary);
+
+static void PrettyPrintSummary(string summary)
+{
+    // Separaciones básicas por etiquetas conocidas.
+    // Esto es un "formatter" MVP: no asume JSON, solo texto.
+    var scorePart = summary;
+    var issuesPart = "";
+    var improvementsPart = "";
+
+    // 1) Split Issues
+    var issuesIndex = summary.IndexOf("Issues:", StringComparison.OrdinalIgnoreCase);
+    if (issuesIndex >= 0)
+    {
+        scorePart = summary[..issuesIndex].Trim();
+        var rest = summary[(issuesIndex + "Issues:".Length)..].Trim();
+
+        // 2) Split Improvements
+        var improvementsIndex = rest.IndexOf("Improvements:", StringComparison.OrdinalIgnoreCase);
+        if (improvementsIndex >= 0)
+        {
+            issuesPart = rest[..improvementsIndex].Trim().TrimEnd('.');
+            improvementsPart = rest[(improvementsIndex + "Improvements:".Length)..].Trim().TrimEnd('.');
+        }
+        else
+        {
+            issuesPart = rest.Trim().TrimEnd('.');
+        }
+    }
+
+    Console.WriteLine("=== RESULTADO ===");
+    Console.WriteLine(scorePart);
+    Console.WriteLine();
+
+    if (!string.IsNullOrWhiteSpace(issuesPart))
+    {
+        Console.WriteLine("=== ISSUES (qué estuvo mal) ===");
+        foreach (var (item, i) in issuesPart.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                             .Select((x, i) => (x.Trim().TrimEnd('.'), i + 1)))
+        {
+            Console.WriteLine($"{i}. {item}");
+        }
+        Console.WriteLine();
+    }
+
+    if (!string.IsNullOrWhiteSpace(improvementsPart))
+    {
+        Console.WriteLine("=== IMPROVEMENTS (qué hacer ahora) ===");
+        foreach (var (item, i) in improvementsPart.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                                   .Select((x, i) => (x.Trim().TrimEnd('.'), i + 1)))
+        {
+            Console.WriteLine($"{i}. {item}");
+        }
+        Console.WriteLine();
+    }
+}

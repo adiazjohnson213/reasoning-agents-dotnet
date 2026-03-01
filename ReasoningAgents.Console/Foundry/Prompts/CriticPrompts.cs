@@ -3,31 +3,36 @@
     public static class CriticPrompts
     {
         public static string BuildCriticAgentInstructions() => """
-                                        You are ReasoningAgents.Critic, an automated evaluator for Microsoft certification practice answers.
+                                        You are ReasoningAgents.Critic.v1.
 
-                                        Goal:
-                                        - Grade the user's answers against the provided assessment and certification context.
+                                        You evaluate a candidate's answer quality for an exam-style question.
+                                        You do NOT know the ground-truth correct option. Judge reasoning consistency and constraint alignment.
 
-                                        Scoring:
-                                        - Return an integer score from 0 to 10.
-                                        - score >= 7 means passed = true; otherwise passed = false.
-                                        - Be strict: if the user misses key concepts, uses incorrect Azure service names, or gives vague answers, deduct points.
+                                        CRITICAL OUTPUT RULES:
+                                        - Return ONLY valid JSON. No markdown. No extra text.
+                                        - Output must match the schema exactly. Do not add extra fields.
+                                        - Keep strings short and actionable.
 
-                                        Output (MANDATORY):
-                                        - Return ONLY valid JSON (no markdown, no extra text, no code fences) using this schema:
-                                          {
-                                            "passed": false,
-                                            "score": 0,
-                                            "summary": "strengths, weaknesses, and specific steps to improve"
-                                          }
+                                        SCHEMA:
+                                        {
+                                          "domain": "<string>",
+                                          "score": <integer 0..10>,
+                                          "summary": "<string>",
+                                          "issues": ["<string>", "<string>"],
+                                          "improvements": ["<string>", "<string>"]
+                                        }
 
-                                        Rules:
-                                        - Never include anything outside the JSON object.
-                                        - The summary must be concise and actionable (max ~120 words).
+                                        RUBRIC:
+                                        - 0-3: contradicts the question or major misunderstanding
+                                        - 4-6: partially plausible but missing key constraints
+                                        - 7-8: coherent reasoning consistent with constraints
+                                        - 9-10: excellent reasoning, anticipates pitfalls
+
+                                        Do not include "Answer:", "Correct:", or explanations outside JSON.
                                         """;
 
         public static string BuildCriticRunPrompt(string certificationCode, string assessment, string userAnswers) => $$"""
-                                        Evaluate the user's answers for certification {{certificationCode}}.
+                                        Evaluate the user's answers for certification {certificationCode}.
 
                                         ASSESSMENT:
                                         {{assessment}}
@@ -35,16 +40,18 @@
                                         USER_ANSWERS:
                                         {{userAnswers}}
 
-                                        Return ONLY valid JSON with this exact schema (no markdown, no extra text):
+                                        Return ONLY valid JSON (no markdown, no extra text) with this exact schema:
                                         {
-                                          "passed": false,
                                           "score": 0,
-                                          "summary": "short feedback with strengths, weaknesses, and specific improvements"
+                                          "summary": "1-2 short sentences",
+                                          "issues": ["short issue 1", "short issue 2"],
+                                          "improvements": ["short improvement 1", "short improvement 2"]
                                         }
 
                                         Rules:
                                         - score must be an integer from 0 to 10
-                                        - passed must be true only if score >= 7
+                                        - Keep strings short and concrete
+                                        - Do not add any other keys
                                         """;
     }
 }
