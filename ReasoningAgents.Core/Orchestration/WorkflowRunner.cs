@@ -5,17 +5,20 @@ namespace ReasoningAgents.Core.Orchestration
 {
     public sealed class WorkflowRunner
     {
+        private readonly IAgentStep<CertificationGoal, string> _preflight;
         private readonly IAgentStep<(CertificationGoal Goal, string PerformanceJson), string> _curator;
         private readonly IAgentStep<(CertificationGoal Goal, string LearningPath), string> _planner;
         private readonly IAgentStep<(CertificationGoal Goal, string StudyPlan), string> _assessor;
         private readonly IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)> _critic;
 
         public WorkflowRunner(
+            IAgentStep<CertificationGoal, string> preflight,
             IAgentStep<(CertificationGoal Goal, string PerformanceJson), string> curator,
             IAgentStep<(CertificationGoal Goal, string LearningPath), string> planner,
             IAgentStep<(CertificationGoal Goal, string StudyPlan), string> assessor,
             IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)> critic)
         {
+            _preflight = preflight;
             _curator = curator;
             _planner = planner;
             _assessor = assessor;
@@ -33,12 +36,16 @@ namespace ReasoningAgents.Core.Orchestration
             string learningPath = "";
             string studyPlan = "";
 
+            var guardrailsJson = await _preflight.ExecuteAsync(goal, ct);
+
             while (true)
             {
                 iterations++;
 
+                var studyPlanWithGuardrails =
+                            $"[ASSESSMENT_GUARDRAILS_JSON]\n{guardrailsJson}\n\n{studyPlan}";
                 // 1) Assess
-                var assessment = await _assessor.ExecuteAsync((goal, studyPlan), ct);
+                var assessment = await _assessor.ExecuteAsync((goal, studyPlanWithGuardrails), ct);
 
                 // 2) User answers
                 var userAnswers = await getUserAnswersAsync(assessment, ct);

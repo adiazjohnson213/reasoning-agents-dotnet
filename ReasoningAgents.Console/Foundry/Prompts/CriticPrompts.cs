@@ -32,13 +32,25 @@
                                         """;
 
         public static string BuildCriticRunPrompt(string certificationCode, string assessment, string userAnswers) => $$"""
-                                        Evaluate the user's answers for certification {certificationCode}.
+                                        Evaluate the user's answers for certification {{certificationCode}}.
 
                                         ASSESSMENT:
                                         {{assessment}}
 
+                                        USER_ANSWERS (format is strict):
+                                        - Each answer MUST be provided as: Q<number>=<A|B|C|D>
+                                        - Example:
+                                          Q1=A
+                                          Q2=B
+                                          Q3=C
+                                          Q4=D
+
                                         USER_ANSWERS:
                                         {{userAnswers}}
+
+                                        Instructions:
+                                        1) Parse USER_ANSWERS by question number (Q1, Q2, ...). Do NOT reorder.
+                                        2) If the format is invalid or a question is missing, set score to 0 and explain the formatting issue in "summary".
 
                                         Return ONLY valid JSON (no markdown, no extra text) with this exact schema:
                                         {

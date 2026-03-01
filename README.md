@@ -1,51 +1,83 @@
 # reasoning-agents-dotnet
 
-A **.NET 10** console application that helps you study for Microsoft certifications by generating practice assessments and grading your answers using **Azure AI Foundry Agent Service (Persistent Agents)**.
+A **.NET 10** console app to practice Microsoft certification scenarios by generating **MCQ assessments** and grading your answers with **Azure AI Foundry Agent Service (Persistent Agents)**.
 
-The app supports two assessment modes:
-- **Quick mode** (small set of questions)
-- **Exam mode** (**50 questions**) distributed by domain using the AI-102 study guide weighting ranges (implemented as a fixed, valid split).
+This repo is built as a personal study tool (not a dump tool). It focuses on repeatable practice loops with clear console UX and production-friendly plumbing.
 
-## Current status
+---
 
-✅ Implemented:
-- CLI parsing (`--cert`, `--days`, `--minutes`, `--exam true/false`)
-- Foundry **Assessment** agent:
-  - Generates **MCQ** questions by **domain + count**
-- Foundry **Critic** agent:
-  - Grades the user's answers and returns **JSON** (parsed into pass/fail + summary)
-- Exam mode orchestration:
-  - Generates **50 questions** using a blueprint (domain → count)
+## What’s implemented
 
-🚧 In progress / next:
-- Replace stub Curator/Planner with real implementations (currently stubs)
-- Improve question display (hide any answer/explanation text if the model returns it)
-- Add automated persistence guidance for agent IDs (currently stored manually in User Secrets)
+### Core flow
+- **Assessment** agent: generates **MCQ** questions (single-best-answer).
+- **Critic** agent: grades your answers and returns **strict JSON** (score + issues + improvements).
+- **Curator** agent: generates a **curated learning path** based on the Critic feedback + last assessment (evidence-driven).
+- **Assessment Preflight** agent (**Microsoft Learn MCP**): fetches up-to-date official guidance and produces **guardrails JSON** used to keep service naming current and avoid deprecated services.
 
-## How it works
+### Modes
+- **Quick mode**: a small set of questions.
+- **Exam mode**: **50 questions** distributed by domain using a fixed AI‑102 blueprint (domain → count).
 
-High-level flow:
-1) Build a study plan (currently stub)
-2) Generate an assessment:
-   - quick: `FoundryAssessmentAgent`
-   - exam: `FoundryExamAssessmentAgent` (blueprint)
-3) You answer in the console
-4) `FoundryCriticAgent` evaluates your answers and returns pass/fail + feedback
+---
 
-Azure AI Foundry Agent Service uses a **thread → run → messages** model for executing agents.
+## How it works (high-level)
 
-## Local run (Console)
+The workflow runs as:
+
+1) **Preflight** (Microsoft Learn MCP)  
+   Produces `[ASSESSMENT_GUARDRAILS_JSON]` to keep names current and avoid deprecated services.
+
+2) **Assessment**  
+   Generates scenario-based MCQs using the domain + study plan context (and guardrails if present).
+
+3) **Human-in-the-loop**  
+   You answer in the console.
+
+4) **Critic**  
+   Grades the answers and returns JSON (score + actionable feedback).
+
+5) **Curate**  
+   Uses evidence (`Critic summary` + last assessment) to propose what to study next.
+
+6) **Plan**  
+   Currently **stubbed** (Planner not implemented yet).
+
+> Azure AI Foundry Agent Service uses a **thread → run → messages** execution model.
+
+---
+
+## Console UX
+
+### Answer format (strict)
+Enter answers as:
+
+```
+Q1=A
+Q2=B
+Q3=C
+Q4=D
+```
+
+Finish input by pressing **Enter on an empty line**.
+
+This avoids ambiguity when the Critic maps answers to questions.
+
+---
+
+## Local run
 
 ### Prerequisites
 - .NET 10 SDK
-- Azure CLI logged in (`az login`) or any valid `DefaultAzureCredential` flow
+- Azure login via `DefaultAzureCredential`:
+  - `az login`, **or**
+  - any other supported credential chain for your environment
 
 ### Build
 ```bash
 dotnet build
 ```
 
-### CLI usage
+### Run (Quick mode)
 
 Show help:
 ```bash
@@ -64,36 +96,49 @@ dotnet run --project ReasoningAgents.Console -- --cert=AI-102 --days=14 --minute
 
 ## Configuration (User Secrets or env vars)
 
-This project uses **Azure AI Foundry project endpoint** + model deployment name.
-
-Project endpoint format:
-`https://<aiservices-id>.services.ai.azure.com/api/projects/<project-name>`
+This project uses:
+- **Azure AI Foundry Project Endpoint**
+- **Model deployment name**
+- Optional agent IDs (to reuse already-created agents)
 
 ### User Secrets (recommended for local dev)
-Set these keys (schema only; do not commit secrets):
-
 ```json
 {
   "Agent": {
     "ProjectEndpoint": "https://<aiservices-id>.services.ai.azure.com/api/projects/<project-name>",
     "DeploymentName": "<model-deployment-name>",
+
     "AssessmentAgentId": "<optional existing agent id>",
-    "CriticAgentId": "<optional existing agent id>"
+    "CriticAgentId": "<optional existing agent id>",
+    "CuratorAgentId": "<optional existing agent id>",
+    "PreflightAgentId": "<optional existing agent id>"
   }
 }
 ```
 
+---
+
+## Notes on Microsoft Learn MCP integration
+
+- The Preflight agent connects to Microsoft Learn via MCP tools (search/fetch) to produce guardrails.
+- MCP tool support requires a **preview** version of the `Azure.AI.Agents.Persistent` SDK (as MCP types are not available in older stable releases).
+
+---
+
 ## Security
-- No secrets committed (keys/tokens/connection strings).
-- Use `DefaultAzureCredential` locally; use managed identity in cloud scenarios.
+
+- Do **not** commit secrets.
+- Use `DefaultAzureCredential` locally; prefer Managed Identity in cloud environments.
+
+---
 
 ## Roadmap
 
-- [x] Create .NET 10 Console app skeleton and first runnable flow (end-to-end).
-- [x] Implement Foundry assessment generation (MCQ by domain + count).
-- [x] Implement Foundry critic evaluation (JSON output + parsing).
-- [x] Add exam mode (50 questions) using a blueprint.
-- [ ] Replace stub Curator/Planner with real implementations.
-- [ ] Improve assessment display (ensure answer/explanation is hidden from the user if present).
-- [ ] Add lightweight unit tests for CLI parsing.
+- [x] End-to-end console loop (assessment → answers → critic).
+- [x] Add exam mode (50 questions) using a fixed blueprint.
+- [x] Add Microsoft Learn MCP preflight for up-to-date guardrails.
+- [x] Add evidence-driven Curator (post-critic).
+- [ ] Implement Planner (currently stub).
+- [ ] Add output persistence (save assessments/results to disk).
+- [ ] Add lightweight tests (CLI parsing, prompt formatting, JSON validation).
 - [ ] Add telemetry / evaluation harness (optional).

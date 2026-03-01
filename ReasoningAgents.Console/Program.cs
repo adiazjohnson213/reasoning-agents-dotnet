@@ -1,6 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using ReasoningAgents.Console.Agents;
 using ReasoningAgents.Console.Cli;
@@ -55,6 +56,7 @@ var persistenClient = new FoundryClientFactory().Create(agentOptions);
 
 var domainAssessor = new FoundryAssessmentAgent(agentOptions, persistenClient);
 
+IAgentStep<CertificationGoal, string> preflight = new FoundryAssessmentPreflightAgent(agentOptions, persistenClient);
 IAgentStep<(CertificationGoal, string), string> curator = new FoundryCuratorAgent(agentOptions, persistenClient, http);
 IAgentStep<(CertificationGoal, string), string> planner = new StubPlannerAgent();
 IAgentStep<(CertificationGoal, string), string> assessor = !opt.IsExamMode
@@ -62,7 +64,7 @@ IAgentStep<(CertificationGoal, string), string> assessor = !opt.IsExamMode
                                                                 : new FoundryExamAssessmentAgent(domainAssessor);
 IAgentStep<(CertificationGoal, string, string), (bool, string)> critic = new FoundryCriticAgent(agentOptions, persistenClient);
 
-var runner = new WorkflowRunner(curator, planner, assessor, critic);
+var runner = new WorkflowRunner(preflight, curator, planner, assessor, critic);
 
 Console.WriteLine("Generating assessment...\n");
 
@@ -72,8 +74,23 @@ var result = await runner.RunAsync(
     {
         Console.WriteLine("=== ASSESSMENT ===");
         Console.WriteLine(assessment);
-        Console.WriteLine("\nPaste your answers and press Enter:");
-        return await Task.Run(() => Console.ReadLine() ?? string.Empty, ct);
+        Console.WriteLine();
+        Console.WriteLine("Enter your answers in this exact format (one per line), then press Enter on an empty line:");
+        Console.WriteLine("Q1=A");
+        Console.WriteLine("Q2=B");
+        Console.WriteLine("Q3=C");
+        Console.WriteLine("Q4=D");
+        Console.WriteLine();
+
+        var sb = new StringBuilder();
+        while (true)
+        {
+            var line = await Task.Run(() => Console.ReadLine(), ct) ?? "";
+            if (string.IsNullOrWhiteSpace(line)) break;
+            sb.AppendLine(line.Trim());
+        }
+
+        return sb.ToString().Trim();
     },
     maxIterations: 1,
     ct: CancellationToken.None
