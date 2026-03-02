@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ReasoningAgents.Application\ReasoningAgents.Application.csproj" />
+    <ProjectReference Include="..\ReasoningAgents.Infrastructure\ReasoningAgents.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

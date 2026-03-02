@@ -1,4 +1,7 @@
 <Solution>
+  <Project Path="ReasoningAgents.Api/ReasoningAgents.Api.csproj" Id="d68b99d9-0699-431c-8e72-f5b8a9c412c5" />
+  <Project Path="ReasoningAgents.Application/ReasoningAgents.Application.csproj" Id="ebfa6efc-2792-4708-8457-81bd43450c2e" />
   <Project Path="ReasoningAgents.Console/ReasoningAgents.Console.csproj" />
-  <Project Path="ReasoningAgents.Core/ReasoningAgents.Core.csproj" Id="16e285c1-3330-4849-a444-c88220536236" />
+  <Project Path="ReasoningAgents.Domain/ReasoningAgents.Domain.csproj" Id="d7a7af75-7652-430d-a015-791d7bf2f335" />
+  <Project Path="ReasoningAgents.Infrastructure/ReasoningAgents.Infrastructure.csproj" Id="3bdceb0f-7517-46c4-bf2b-abe34e608e63" />
 </Solution>

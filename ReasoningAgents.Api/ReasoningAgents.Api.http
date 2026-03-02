@@ -1,0 +1,6 @@
+@ReasoningAgents.Api_HostAddress = http://localhost:5209
+
+GET {{ReasoningAgents.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
