@@ -1,4 +1,5 @@
 ﻿using ReasoningAgents.Domain.Agents;
+using ReasoningAgents.Domain.Inputs;
 using ReasoningAgents.Domain.Models;
 
 namespace ReasoningAgents.Application.Orchestration
@@ -6,17 +7,17 @@ namespace ReasoningAgents.Application.Orchestration
     public sealed class WorkflowRunner
     {
         private readonly IAgentStep<CertificationGoal, string> _preflight;
-        private readonly IAgentStep<(CertificationGoal Goal, string PerformanceJson), string> _curator;
-        private readonly IAgentStep<(CertificationGoal Goal, string LearningPath), string> _planner;
-        private readonly IAgentStep<(CertificationGoal Goal, string StudyPlan), string> _assessor;
-        private readonly IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)> _critic;
+        private readonly IAgentStep<CuratorInput, string> _curator;
+        private readonly IAgentStep<PlannerInput, string> _planner;
+        private readonly IAgentStep<AssessmentInput, string> _assessor;
+        private readonly IAgentStep<CriticInput, (bool Passed, string Summary)> _critic;
 
         public WorkflowRunner(
             IAgentStep<CertificationGoal, string> preflight,
-            IAgentStep<(CertificationGoal Goal, string PerformanceJson), string> curator,
-            IAgentStep<(CertificationGoal Goal, string LearningPath), string> planner,
-            IAgentStep<(CertificationGoal Goal, string StudyPlan), string> assessor,
-            IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)> critic)
+            IAgentStep<CuratorInput, string> curator,
+            IAgentStep<PlannerInput, string> planner,
+            IAgentStep<AssessmentInput, string> assessor,
+            IAgentStep<CriticInput, (bool Passed, string Summary)> critic)
         {
             _preflight = preflight;
             _curator = curator;
@@ -45,13 +46,13 @@ namespace ReasoningAgents.Application.Orchestration
                 var studyPlanWithGuardrails =
                             $"[ASSESSMENT_GUARDRAILS_JSON]\n{guardrailsJson}\n\n{studyPlan}";
                 // 1) Assess
-                var assessment = await _assessor.ExecuteAsync((goal, studyPlanWithGuardrails), ct);
+                var assessment = await _assessor.ExecuteAsync(new(goal, studyPlanWithGuardrails), ct);
 
                 // 2) User answers
                 var userAnswers = await getUserAnswersAsync(assessment, ct);
 
                 // 3) Critic
-                var (passed, summary) = await _critic.ExecuteAsync((goal, assessment, userAnswers), ct);
+                var (passed, summary) = await _critic.ExecuteAsync(new(goal, assessment, userAnswers), ct);
 
                 if (passed)
                 {
@@ -69,8 +70,8 @@ namespace ReasoningAgents.Application.Orchestration
                     $"[PERFORMANCE_FEEDBACK]\n{summary}\n\n" +
                     $"[LAST_ASSESSMENT]\n{assessment}";
 
-                learningPath = await _curator.ExecuteAsync((goal, performanceBlob), ct);
-                studyPlan = await _planner.ExecuteAsync((goal, learningPath), ct);
+                learningPath = await _curator.ExecuteAsync(new(goal, performanceBlob), ct);
+                studyPlan = await _planner.ExecuteAsync(new(goal, learningPath), ct);
 
                 // 5) Now decide whether we can iterate again
                 if (iterations >= maxIterations)

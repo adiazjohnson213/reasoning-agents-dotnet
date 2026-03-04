@@ -3,13 +3,13 @@ using System.Text.Json;
 using Azure;
 using Azure.AI.Agents.Persistent;
 using ReasoningAgents.Domain.Agents;
-using ReasoningAgents.Domain.Models;
+using ReasoningAgents.Domain.Inputs;
 using ReasoningAgents.Infrastructure.Configuration;
 using ReasoningAgents.Infrastructure.Foundry.Prompts;
 
 namespace ReasoningAgents.Infrastructure.Foundry
 {
-    public sealed class FoundryCuratorAgent : IAgentStep<(CertificationGoal Goal, string PerformanceJson), string>
+    public sealed class FoundryCuratorAgent : IAgentStep<CuratorInput, string>
     {
         private readonly AgentOptions _options;
         private readonly PersistentAgentsClient _client;
@@ -25,7 +25,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
             _http = http;
         }
 
-        public async Task<string> ExecuteAsync((CertificationGoal Goal, string PerformanceJson) input, CancellationToken ct)
+        public async Task<string> ExecuteAsync(CuratorInput input, CancellationToken ct)
         {
             PersistentAgent agent;
 

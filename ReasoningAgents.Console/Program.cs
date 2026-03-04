@@ -7,6 +7,7 @@ using ReasoningAgents.Application.Orchestration;
 using ReasoningAgents.Console.Cli;
 using ReasoningAgents.Console.Output;
 using ReasoningAgents.Domain.Agents;
+using ReasoningAgents.Domain.Inputs;
 using ReasoningAgents.Domain.Models;
 using ReasoningAgents.Infrastructure.Configuration;
 using ReasoningAgents.Infrastructure.Foundry;
@@ -57,12 +58,11 @@ var persistenClient = new FoundryClientFactory().Create(agentOptions);
 var domainAssessor = new FoundryAssessmentAgent(agentOptions, persistenClient);
 
 IAgentStep<CertificationGoal, string> preflight = new FoundryAssessmentPreflightAgent(agentOptions, persistenClient);
-IAgentStep<(CertificationGoal, string), string> curator = new FoundryCuratorAgent(agentOptions, persistenClient, http);
-IAgentStep<(CertificationGoal, string), string> planner = new FoundryPlannerAgent(agentOptions, persistenClient);
-IAgentStep<(CertificationGoal, string), string> assessor = !opt.IsExamMode
-                                                                ? domainAssessor
+IAgentStep<CuratorInput, string> curator = new FoundryCuratorAgent(agentOptions, persistenClient, http);
+IAgentStep<PlannerInput, string> planner = new FoundryPlannerAgent(agentOptions, persistenClient);
+IAgentStep<AssessmentInput, string> assessor = !opt.IsExamMode ? domainAssessor
                                                                 : new FoundryExamAssessmentAgent(domainAssessor);
-IAgentStep<(CertificationGoal, string, string), (bool, string)> critic = new FoundryCriticAgent(agentOptions, persistenClient);
+IAgentStep<CriticInput, (bool Passed, string Summary)> critic = new FoundryCriticAgent(agentOptions, persistenClient);
 
 var runner = new WorkflowRunner(preflight, curator, planner, assessor, critic);
 

@@ -1,16 +1,16 @@
 ﻿using System.Text;
 using ReasoningAgents.Domain.Agents;
-using ReasoningAgents.Domain.Models;
+using ReasoningAgents.Domain.Inputs;
 
 namespace ReasoningAgents.Infrastructure.Foundry
 {
-    public sealed class FoundryExamAssessmentAgent : IAgentStep<(CertificationGoal Goal, string StudyPlan), string>
+    public sealed class FoundryExamAssessmentAgent : IAgentStep<AssessmentInput, string>
     {
         private readonly FoundryAssessmentAgent _domainGenerator;
         public FoundryExamAssessmentAgent(FoundryAssessmentAgent domainGenerator)
             => _domainGenerator = domainGenerator;
 
-        public async Task<string> ExecuteAsync((CertificationGoal Goal, string StudyPlan) input, CancellationToken ct)
+        public async Task<string> ExecuteAsync(AssessmentInput input, CancellationToken ct)
         {
             var blueprint = new (string Domain, int Count)[]
             {

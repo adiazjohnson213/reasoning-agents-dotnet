@@ -2,13 +2,14 @@
 using Azure;
 using Azure.AI.Agents.Persistent;
 using ReasoningAgents.Domain.Agents;
+using ReasoningAgents.Domain.Inputs;
 using ReasoningAgents.Domain.Models;
 using ReasoningAgents.Infrastructure.Configuration;
 using ReasoningAgents.Infrastructure.Foundry.Prompts;
 
 namespace ReasoningAgents.Infrastructure.Foundry
 {
-    public sealed class FoundryAssessmentAgent : IAgentStep<(CertificationGoal Goal, string StudyPlan), string>
+    public sealed class FoundryAssessmentAgent : IAgentStep<AssessmentInput, string>
     {
         private readonly AgentOptions _options;
         private readonly PersistentAgentsClient _client;
@@ -19,7 +20,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
             _client = client;
         }
 
-        public async Task<string> ExecuteAsync((CertificationGoal Goal, string StudyPlan) input, CancellationToken ct)
+        public async Task<string> ExecuteAsync(AssessmentInput input, CancellationToken ct)
         {
             return await GenerateDomainAsync(input.Goal, input.StudyPlan, input.Goal.CertificationCode, 4, ct);
         }

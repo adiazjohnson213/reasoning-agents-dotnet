@@ -3,14 +3,14 @@ using System.Text.Json;
 using Azure;
 using Azure.AI.Agents.Persistent;
 using ReasoningAgents.Domain.Agents;
-using ReasoningAgents.Domain.Models;
+using ReasoningAgents.Domain.Inputs;
 using ReasoningAgents.Infrastructure.Configuration;
 using ReasoningAgents.Infrastructure.Foundry.Prompts;
 
 namespace ReasoningAgents.Infrastructure.Foundry
 {
     public sealed class FoundryCriticAgent
-        : IAgentStep<(CertificationGoal Goal, string Assessment, string UserAnswers), (bool Passed, string Summary)>
+        : IAgentStep<CriticInput, (bool Passed, string Summary)>
     {
         private readonly AgentOptions _options;
         private readonly PersistentAgentsClient _client;
@@ -21,7 +21,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
             _client = client;
         }
 
-        public async Task<(bool Passed, string Summary)> ExecuteAsync((CertificationGoal Goal, string Assessment, string UserAnswers) input,
+        public async Task<(bool Passed, string Summary)> ExecuteAsync(CriticInput input,
                                                                       CancellationToken ct)
         {
             PersistentAgent agent;
