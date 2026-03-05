@@ -35,31 +35,49 @@ namespace ReasoningAgents.Infrastructure.Foundry
                 agent = await _client.Administration.CreateAgentAsync(
                     model: _options.DeploymentName,
                     name: "ReasoningAgents.Critic.v1",
-                    description: "Grades certification practice answers with a strict JSON rubric (score 0–10) and returns actionable feedback.",
+                    description: "Grades certification practice answers with a strict JSON rubric (score 0–100) and returns actionable feedback.",
                     instructions: CriticPrompts.BuildCriticAgentInstructions(),
                     cancellationToken: ct);
             }
 
-            PersistentAgentThread thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
+            PersistentAgentThread? thread = null;
+            try
+            {
+                thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
 
-            var prompt = CriticPrompts.BuildCriticRunPrompt(input.Goal.CertificationCode,
-                                                            input.Assessment,
-                                                            input.UserAnswers);
+                var prompt = CriticPrompts.BuildCriticRunPrompt(input.Goal.CertificationCode,
+                                                                input.Assessment,
+                                                                input.UserAnswers);
 
-            await _client.Messages.CreateMessageAsync(thread.Id,
-                                                      MessageRole.User,
-                                                      prompt,
-                                                      cancellationToken: ct);
+                await _client.Messages.CreateMessageAsync(thread.Id,
+                                                          MessageRole.User,
+                                                          prompt,
+                                                          cancellationToken: ct);
 
-            ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id,
-                                                              agent.Id,
-                                                              cancellationToken: ct);
+                ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id,
+                                                                  agent.Id,
+                                                                  cancellationToken: ct);
 
-            run = await WaitForRunCompletionAsync(thread.Id, run.Id, ct);
+                run = await WaitForRunCompletionAsync(thread.Id, run.Id, ct);
 
-            var lastAssistantText = GetLastAgentTextForRun(thread.Id, run.Id, ct);
+                var lastAssistantText = GetLastAgentTextForRun(thread.Id, run.Id, ct);
 
-            return ParseCriticJson(lastAssistantText);
+                return ParseCriticJson(lastAssistantText);
+            }
+            finally
+            {
+                if (thread is not null)
+                {
+                    try
+                    {
+                        await _client.Threads.DeleteThreadAsync(thread.Id, cancellationToken: CancellationToken.None);
+                        await _client.Administration.DeleteAgentAsync(agent.Id, cancellationToken: CancellationToken.None);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
 
         private async Task<ThreadRun> WaitForRunCompletionAsync(string threadId, string runId, CancellationToken ct)
@@ -133,7 +151,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
 
                 var score = root.GetProperty("score").GetInt32();
 
-                if (score < 0 || score > 10)
+                if (score < 0 || score > 100)
                     throw new InvalidOperationException($"Invalid score returned: {score}");
 
                 var summary = root.TryGetProperty("summary", out var summaryEl)
@@ -146,7 +164,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
                     ? (domainEl.GetString() ?? "")
                     : "";
 
-                var passed = score >= 7;
+                var passed = score >= 70;
 
                 return new CriticEvaluation(
                     Passed: passed,

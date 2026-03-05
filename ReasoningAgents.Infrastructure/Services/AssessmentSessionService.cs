@@ -70,12 +70,22 @@ namespace ReasoningAgents.Infrastructure.Services
             var evaluation = await _critic.ExecuteAsync(new(session.Goal, session.AssessmentText, answers), ct);
 
             // 2) Curate + Plan (always produce next steps)
+            var performanceJson = JsonSerializer.Serialize(new
+            {
+                certification = session.Goal.CertificationCode,
+                passed = evaluation.Passed,
+                score = evaluation.Score,
+                summary = evaluation.Summary,
+                issues = evaluation.Issues,
+                improvements = evaluation.Improvements
+            });
+
             var performanceBlob =
-                $"[PERFORMANCE_FEEDBACK]\n{evaluation.Summary}\n\n" +
+                $"[PERFORMANCE_REPORT_JSON]\n{performanceJson}\n\n" +
                 $"[LAST_ASSESSMENT]\n{session.AssessmentText}";
 
             var learningPathJson = await _curator.ExecuteAsync(new(session.Goal, performanceBlob), ct);
-            var studyPlanJson = await _planner.ExecuteAsync(new(session.Goal, learningPathJson), ct);
+            var studyPlanJson = await _planner.ExecuteAsync(new(session.Goal, performanceJson, learningPathJson), ct);
 
             // Optional: keep session for next iteration or remove it once answered
             // _store.Remove(sessionId);

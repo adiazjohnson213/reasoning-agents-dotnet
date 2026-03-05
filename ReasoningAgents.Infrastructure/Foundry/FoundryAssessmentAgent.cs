@@ -45,50 +45,69 @@ namespace ReasoningAgents.Infrastructure.Foundry
                                                                       cancellationToken: ct);
             }
 
-            PersistentAgentThread thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
+            PersistentAgentThread? thread = null;
 
-            var prompt = AssessmentPrompts.BuildAssessmentRunPrompt(goal.CertificationCode,
-                                                                    studyPlan,
-                                                                    domain,
-                                                                    count);
-
-            await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
-
-            ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id, agent.Id, cancellationToken: ct);
-
-            var started = DateTimeOffset.UtcNow;
-            var timeout = TimeSpan.FromMinutes(2);
-
-            while (run.Status == RunStatus.Queued || run.Status == RunStatus.InProgress || run.Status == RunStatus.RequiresAction)
+            try
             {
-                ct.ThrowIfCancellationRequested();
+                thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
 
-                if (DateTimeOffset.UtcNow - started > timeout)
-                    throw new TimeoutException($"Run timed out. Last status: {run.Status}");
+                var prompt = AssessmentPrompts.BuildAssessmentRunPrompt(goal.CertificationCode,
+                                                                        studyPlan,
+                                                                        domain,
+                                                                        count);
 
-                await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
-                run = await _client.Runs.GetRunAsync(thread.Id, run.Id, ct);
+                await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
+
+                ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id, agent.Id, cancellationToken: ct);
+
+                var started = DateTimeOffset.UtcNow;
+                var timeout = TimeSpan.FromMinutes(2);
+
+                while (run.Status == RunStatus.Queued || run.Status == RunStatus.InProgress || run.Status == RunStatus.RequiresAction)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    if (DateTimeOffset.UtcNow - started > timeout)
+                        throw new TimeoutException($"Run timed out. Last status: {run.Status}");
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
+                    run = await _client.Runs.GetRunAsync(thread.Id, run.Id, ct);
+                }
+
+                if (run.Status != RunStatus.Completed)
+                    throw new InvalidOperationException($"Run did not complete successfully. Status: {run.Status}");
+
+                Pageable<PersistentThreadMessage> messages = _client.Messages.GetMessages(threadId: thread.Id, order: ListSortOrder.Ascending, cancellationToken: ct);
+
+                string? last = null;
+                foreach (var msg in messages)
+                {
+                    if (msg.Role != MessageRole.Agent) continue;
+
+                    var textSb = new StringBuilder();
+                    foreach (var content in msg.ContentItems)
+                        if (content is MessageTextContent t) textSb.Append(t.Text);
+
+                    var text = textSb.ToString().Trim();
+                    if (!string.IsNullOrWhiteSpace(text)) last = text;
+                }
+
+                return last ?? throw new InvalidOperationException("No agent response text was returned.");
             }
-
-            if (run.Status != RunStatus.Completed)
-                throw new InvalidOperationException($"Run did not complete successfully. Status: {run.Status}");
-
-            Pageable<PersistentThreadMessage> messages = _client.Messages.GetMessages(threadId: thread.Id, order: ListSortOrder.Ascending, cancellationToken: ct);
-
-            string? last = null;
-            foreach (var msg in messages)
+            finally
             {
-                if (msg.Role != MessageRole.Agent) continue;
-
-                var textSb = new StringBuilder();
-                foreach (var content in msg.ContentItems)
-                    if (content is MessageTextContent t) textSb.Append(t.Text);
-
-                var text = textSb.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(text)) last = text;
+                if (thread is not null)
+                {
+                    try
+                    {
+                        await _client.Threads.DeleteThreadAsync(thread.Id, cancellationToken: CancellationToken.None);
+                        await _client.Administration.DeleteAgentAsync(agent.Id, cancellationToken: CancellationToken.None);
+                    }
+                    catch
+                    {
+                    }
+                }
             }
-
-            return last ?? throw new InvalidOperationException("No agent response text was returned.");
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using ReasoningAgents.Domain.Agents;
+﻿using System.Text.Json;
+using ReasoningAgents.Domain.Agents;
 using ReasoningAgents.Domain.Inputs;
 using ReasoningAgents.Domain.Models;
 
@@ -69,12 +70,22 @@ namespace ReasoningAgents.Application.Orchestration
                 }
 
                 // 4) Curate + Plan ALWAYS on failure (even on last iteration)
+                var performanceJson = JsonSerializer.Serialize(new
+                {
+                    certification = goal.CertificationCode,
+                    passed = evaluation.Passed,
+                    score = evaluation.Score,
+                    summary = evaluation.Summary,
+                    issues = evaluation.Issues,
+                    improvements = evaluation.Improvements
+                });
+
                 var performanceBlob =
-                    $"[PERFORMANCE_FEEDBACK]\n{evaluation}\n\n" +
+                    $"[PERFORMANCE_REPORT_JSON]\n{performanceJson}\n\n" +
                     $"[LAST_ASSESSMENT]\n{assessment}";
 
                 learningPath = await _curator.ExecuteAsync(new(goal, performanceBlob), ct);
-                studyPlan = await _planner.ExecuteAsync(new(goal, learningPath), ct);
+                studyPlan = await _planner.ExecuteAsync(new(goal, performanceJson, learningPath), ct);
 
                 // 5) Now decide whether we can iterate again
                 if (iterations >= maxIterations)

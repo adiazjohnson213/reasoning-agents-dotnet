@@ -31,10 +31,10 @@ namespace ReasoningAgents.Infrastructure.Foundry
                 sb.AppendLine($"=== DOMAIN: {domain} ({count}) ===");
                 sb.AppendLine(block);
                 sb.AppendLine();
+                sb.AppendLine();
             }
 
-            return sb.ToString();
-
+            return ExamTextNormalizer.NormalizeAndRenumber(sb.ToString());
         }
     }
 }

@@ -36,64 +36,82 @@ namespace ReasoningAgents.Infrastructure.Foundry
             }
             else
             {
-                agent = await _client.Administration.CreateAgentAsync(model: _options.DeploymentName,
+                agent = await _client.Administration.CreateAgentAsync(model: "gpt-4.1-mini",
                                                                       name: "ReasoningAgents.AssessmentPreflight.v1",
                                                                       description: "Fetches up-to-date Microsoft Learn grounding to build assessment guardrails.",
                                                                       instructions: PreflightPrompts.BuildPreflightAgentInstructions(),
                                                                       tools: [mcpTool],
                                                                       cancellationToken: ct);
             }
+            PersistentAgentThread? thread = null;
 
-            PersistentAgentThread thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
-
-            var prompt = PreflightPrompts.BuildPreflightRunPrompt(input.CertificationCode);
-            await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
-
-            MCPToolResource mcpToolResource = new(McpServerLabel);
-            ToolResources toolResources = mcpToolResource.ToToolResources();
-
-            ThreadRun run = await _client.Runs.CreateRunAsync(thread, agent, toolResources, cancellationToken: ct);
-
-            var started = DateTimeOffset.UtcNow;
-            var timeout = TimeSpan.FromMinutes(2);
-
-            while (run.Status == RunStatus.Queued || run.Status == RunStatus.InProgress || run.Status == RunStatus.RequiresAction)
+            try
             {
-                ct.ThrowIfCancellationRequested();
+                thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
 
-                if (DateTimeOffset.UtcNow - started > timeout)
-                    throw new TimeoutException($"Preflight run timed out. Last status: {run.Status}");
+                var prompt = PreflightPrompts.BuildPreflightRunPrompt(input.CertificationCode);
+                await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
 
-                await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
-                run = await _client.Runs.GetRunAsync(thread.Id, run.Id, ct);
+                MCPToolResource mcpToolResource = new(McpServerLabel);
+                ToolResources toolResources = mcpToolResource.ToToolResources();
 
-                if (run.Status == RunStatus.RequiresAction && run.RequiredAction is SubmitToolApprovalAction toolApprovalAction)
+                ThreadRun run = await _client.Runs.CreateRunAsync(thread, agent, toolResources, cancellationToken: ct);
+
+                var started = DateTimeOffset.UtcNow;
+                var timeout = TimeSpan.FromMinutes(2);
+
+                while (run.Status == RunStatus.Queued || run.Status == RunStatus.InProgress || run.Status == RunStatus.RequiresAction)
                 {
-                    var approvals = new List<ToolApproval>();
+                    ct.ThrowIfCancellationRequested();
 
-                    foreach (var toolCall in toolApprovalAction.SubmitToolApproval.ToolCalls)
+                    if (DateTimeOffset.UtcNow - started > timeout)
+                        throw new TimeoutException($"Preflight run timed out. Last status: {run.Status}");
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
+                    run = await _client.Runs.GetRunAsync(thread.Id, run.Id, ct);
+
+                    if (run.Status == RunStatus.RequiresAction && run.RequiredAction is SubmitToolApprovalAction toolApprovalAction)
                     {
-                        if (toolCall is RequiredMcpToolCall mcpToolCall)
+                        var approvals = new List<ToolApproval>();
+
+                        foreach (var toolCall in toolApprovalAction.SubmitToolApproval.ToolCalls)
                         {
-                            approvals.Add(new ToolApproval(mcpToolCall.Id, approve: true));
+                            if (toolCall is RequiredMcpToolCall mcpToolCall)
+                            {
+                                approvals.Add(new ToolApproval(mcpToolCall.Id, approve: true));
+                            }
+                        }
+
+                        if (approvals.Count > 0)
+                        {
+                            run = await _client.Runs.SubmitToolOutputsToRunAsync(
+                                thread.Id,
+                                run.Id,
+                                toolApprovals: approvals,
+                                cancellationToken: ct);
                         }
                     }
+                }
 
-                    if (approvals.Count > 0)
+                if (run.Status != RunStatus.Completed)
+                    throw new InvalidOperationException($"Preflight run did not complete successfully. Status: {run.Status}. Error: {run.LastError?.Message}");
+
+                return ReadLastAgentTextForRun(thread.Id, run.Id, ct);
+            }
+            finally
+            {
+                if (thread is not null)
+                {
+                    try
                     {
-                        run = await _client.Runs.SubmitToolOutputsToRunAsync(
-                            thread.Id,
-                            run.Id,
-                            toolApprovals: approvals,
-                            cancellationToken: ct);
+                        await _client.Threads.DeleteThreadAsync(thread.Id, cancellationToken: CancellationToken.None);
+                        await _client.Administration.DeleteAgentAsync(agent.Id, cancellationToken: CancellationToken.None);
+                    }
+                    catch
+                    {
                     }
                 }
             }
-
-            if (run.Status != RunStatus.Completed)
-                throw new InvalidOperationException($"Preflight run did not complete successfully. Status: {run.Status}. Error: {run.LastError?.Message}");
-
-            return ReadLastAgentTextForRun(thread.Id, run.Id, ct);
         }
 
         private string ReadLastAgentTextForRun(string threadId, string runId, CancellationToken ct)

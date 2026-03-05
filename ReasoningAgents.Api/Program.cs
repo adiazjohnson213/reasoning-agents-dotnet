@@ -36,7 +36,10 @@ builder.Services
 builder.Services.AddTransient<IAgentStep<CertificationGoal, string>, FoundryAssessmentPreflightAgent>();
 
 // Assessment concrete agents (for runtime selection)
-builder.Services.AddTransient<IAgentStep<AssessmentInput, string>, FoundryAssessmentAgent>();
+builder.Services.AddTransient<FoundryAssessmentAgent>();
+builder.Services.AddTransient<IAgentStep<AssessmentInput, string>, FoundryExamAssessmentAgent>();
+
+//builder.Services.AddTransient<IAgentStep<AssessmentInput, string>, FoundryAssessmentAgent>();
 
 // Critic / Curator / Planner
 builder.Services.AddTransient<IAgentStep<CriticInput, CriticEvaluation>, FoundryCriticAgent>();

@@ -8,7 +8,7 @@ namespace ReasoningAgents.Console.Output
         {
             System.Console.WriteLine("=== RESULTADO ===");
             System.Console.WriteLine($"Passed: {result.Passed}");
-            System.Console.WriteLine($"Score: {result.Score}/10");
+            System.Console.WriteLine($"Score: {result.Score}/100");
 
             if (!string.IsNullOrWhiteSpace(result.Summary))
             {

@@ -36,36 +36,56 @@ namespace ReasoningAgents.Infrastructure.Foundry
                     cancellationToken: ct);
             }
 
-            PersistentAgentThread thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
+            PersistentAgentThread? thread = null;
 
-            var prompt = PlannerPrompts.BuildPlannerRunPrompt(certificationCode: input.Goal.CertificationCode,
-                                                              days: input.Goal.DaysAvailable,
-                                                              minutesPerDay: input.Goal.DailyMinutes,
-                                                              learningPath: input.LearningPath);
-
-            await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
-
-            ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id, agent.Id, cancellationToken: ct);
-
-            // Poll
-            var started = DateTimeOffset.UtcNow;
-            var timeout = TimeSpan.FromMinutes(2);
-
-            while (run.Status == RunStatus.Queued || run.Status == RunStatus.InProgress || run.Status == RunStatus.RequiresAction)
+            try
             {
-                ct.ThrowIfCancellationRequested();
+                thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
 
-                if (DateTimeOffset.UtcNow - started > timeout)
-                    throw new TimeoutException($"Run timed out. Last status: {run.Status}");
+                var prompt = PlannerPrompts.BuildPlannerRunPrompt(certificationCode: input.Goal.CertificationCode,
+                                                                  days: input.Goal.DaysAvailable,
+                                                                  minutesPerDay: input.Goal.DailyMinutes,
+                                                                  performanceJson: input.PerformanceJson,
+                                                                  learningPath: input.LearningPath);
 
-                await Task.Delay(TimeSpan.FromMilliseconds(400), ct);
-                run = await _client.Runs.GetRunAsync(thread.Id, run.Id, ct);
+                await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
+
+                ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id, agent.Id, cancellationToken: ct);
+
+                // Poll
+                var started = DateTimeOffset.UtcNow;
+                var timeout = TimeSpan.FromMinutes(2);
+
+                while (run.Status == RunStatus.Queued || run.Status == RunStatus.InProgress || run.Status == RunStatus.RequiresAction)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    if (DateTimeOffset.UtcNow - started > timeout)
+                        throw new TimeoutException($"Run timed out. Last status: {run.Status}");
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(400), ct);
+                    run = await _client.Runs.GetRunAsync(thread.Id, run.Id, ct);
+                }
+
+                if (run.Status != RunStatus.Completed)
+                    throw new InvalidOperationException($"Run did not complete successfully. Status: {run.Status}. Error: {run.LastError?.Message}");
+
+                return ReadLastAgentTextForRun(thread.Id, run.Id, ct);
             }
-
-            if (run.Status != RunStatus.Completed)
-                throw new InvalidOperationException($"Run did not complete successfully. Status: {run.Status}. Error: {run.LastError?.Message}");
-
-            return ReadLastAgentTextForRun(thread.Id, run.Id, ct);
+            finally
+            {
+                if (thread is not null)
+                {
+                    try
+                    {
+                        await _client.Threads.DeleteThreadAsync(thread.Id, cancellationToken: CancellationToken.None);
+                        await _client.Administration.DeleteAgentAsync(agent.Id, cancellationToken: CancellationToken.None);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
 
         private string ReadLastAgentTextForRun(string threadId, string runId, CancellationToken ct)

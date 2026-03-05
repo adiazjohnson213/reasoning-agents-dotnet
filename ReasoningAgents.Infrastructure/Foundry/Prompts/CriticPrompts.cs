@@ -16,17 +16,24 @@
                                         SCHEMA:
                                         {
                                           "domain": "<string>",
-                                          "score": <integer 0..10>,
+                                          "score": <integer 0..100>,
                                           "summary": "<string>",
                                           "issues": ["<string>", "<string>"],
                                           "improvements": ["<string>", "<string>"]
                                         }
 
                                         RUBRIC:
-                                        - 0-3: contradicts the question or major misunderstanding
-                                        - 4-6: partially plausible but missing key constraints
-                                        - 7-8: coherent reasoning consistent with constraints
-                                        - 9-10: excellent reasoning, anticipates pitfalls
+                                        - 0-19: contradicts the question or shows major misunderstanding
+                                        - 20-39: weak answer, mostly inconsistent with the scenario or constraints
+                                        - 40-59: partially plausible but misses important constraints or confuses services
+                                        - 60-79: mostly coherent reasoning, generally aligned with constraints, but incomplete
+                                        - 80-89: strong reasoning, consistent with constraints, minor weaknesses only
+                                        - 90-100: excellent reasoning, precise, well-aligned, and anticipates pitfalls
+
+                                        SCORING RULES:
+                                        - Use the full 0-100 scale.
+                                        - Reserve 90-100 for truly exceptional answers.
+                                        - Do not default to round numbers unless justified by the answer quality.
 
                                         Do not include "Answer:", "Correct:", or explanations outside JSON.
                                         """;
@@ -61,7 +68,7 @@
                                         }
 
                                         Rules:
-                                        - score must be an integer from 0 to 10
+                                        - score must be an integer from 0 to 100
                                         - Keep strings short and concrete
                                         - Do not add any other keys
                                         """;

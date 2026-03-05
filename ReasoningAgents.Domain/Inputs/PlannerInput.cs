@@ -2,5 +2,5 @@
 
 namespace ReasoningAgents.Domain.Inputs
 {
-    public sealed record PlannerInput(CertificationGoal Goal, string LearningPath);
+    public sealed record PlannerInput(CertificationGoal Goal, string PerformanceJson, string LearningPath);
 }

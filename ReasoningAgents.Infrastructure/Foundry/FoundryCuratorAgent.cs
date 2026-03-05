@@ -50,20 +50,39 @@ namespace ReasoningAgents.Infrastructure.Foundry
                     cancellationToken: ct);
             }
 
-            PersistentAgentThread thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
+            PersistentAgentThread? thread = null;
 
-            var prompt = CuratorPrompts.BuildCuratorRunPrompt(
-                certificationCode: input.Goal.CertificationCode,
-                performanceJson: input.PerformanceJson);
+            try
+            {
+                thread = await _client.Threads.CreateThreadAsync(cancellationToken: ct);
 
-            await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
+                var prompt = CuratorPrompts.BuildCuratorRunPrompt(
+                    certificationCode: input.Goal.CertificationCode,
+                    performanceJson: input.PerformanceJson);
 
-            ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id, agent.Id, cancellationToken: ct);
+                await _client.Messages.CreateMessageAsync(thread.Id, MessageRole.User, prompt, cancellationToken: ct);
 
-            run = await WaitForRunCompletionHandlingToolsAsync(thread.Id, run, ct);
+                ThreadRun run = await _client.Runs.CreateRunAsync(thread.Id, agent.Id, cancellationToken: ct);
 
-            var last = ReadLastAgentTextForRun(thread.Id, run.Id, ct);
-            return last;
+                run = await WaitForRunCompletionHandlingToolsAsync(thread.Id, run, ct);
+
+                var last = ReadLastAgentTextForRun(thread.Id, run.Id, ct);
+                return last;
+            }
+            finally
+            {
+                if (thread is not null)
+                {
+                    try
+                    {
+                        await _client.Threads.DeleteThreadAsync(thread.Id, cancellationToken: CancellationToken.None);
+                        await _client.Administration.DeleteAgentAsync(agent.Id, cancellationToken: CancellationToken.None);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
 
         private async Task<ThreadRun> WaitForRunCompletionHandlingToolsAsync(string threadId, ThreadRun run, CancellationToken ct)
