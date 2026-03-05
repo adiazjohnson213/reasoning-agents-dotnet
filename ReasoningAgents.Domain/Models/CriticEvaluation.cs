@@ -1,13 +1,11 @@
 ﻿namespace ReasoningAgents.Domain.Models
 {
-    public sealed record WorkflowResult(
+    public sealed record CriticEvaluation(
         bool Passed,
         int Score,
         string Summary,
         IReadOnlyList<string> Issues,
         IReadOnlyList<string> Improvements,
-        int Iterations,
-        string? LearningPath = null,
-        string? StudyPlan = null
+        string? Domain = null
     );
 }

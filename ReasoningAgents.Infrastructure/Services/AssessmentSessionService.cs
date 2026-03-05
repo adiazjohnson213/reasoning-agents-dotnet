@@ -15,7 +15,7 @@ namespace ReasoningAgents.Infrastructure.Services
 
         private readonly IAgentStep<CertificationGoal, string> _preflight;
         private readonly IAgentStep<AssessmentInput, string> _assessor;
-        private readonly IAgentStep<CriticInput, (bool Passed, string Summary)> _critic;
+        private readonly IAgentStep<CriticInput, CriticEvaluation> _critic;
         private readonly IAgentStep<CuratorInput, string> _curator;
         private readonly IAgentStep<PlannerInput, string> _planner;
 
@@ -23,7 +23,7 @@ namespace ReasoningAgents.Infrastructure.Services
             IAssessmentSessionStore store,
             IAgentStep<CertificationGoal, string> preflight,
             IAgentStep<AssessmentInput, string> assessor,
-            IAgentStep<CriticInput, (bool, string)> critic,
+            IAgentStep<CriticInput, CriticEvaluation> critic,
             IAgentStep<CuratorInput, string> curator,
             IAgentStep<PlannerInput, string> planner)
         {
@@ -67,15 +67,11 @@ namespace ReasoningAgents.Infrastructure.Services
                 throw new InvalidOperationException("Session not found or expired.");
 
             // 1) Critic
-            var (passed, summary) = await _critic.ExecuteAsync(new(session.Goal, session.AssessmentText, answers), ct);
-
-            // Parse score/issues/improvements from the summary if you already output JSON,
-            // or keep your existing string parsing logic.
-            var (score, issues, improvements) = TryExtractCriticParts(summary);
+            var evaluation = await _critic.ExecuteAsync(new(session.Goal, session.AssessmentText, answers), ct);
 
             // 2) Curate + Plan (always produce next steps)
             var performanceBlob =
-                $"[PERFORMANCE_FEEDBACK]\n{summary}\n\n" +
+                $"[PERFORMANCE_FEEDBACK]\n{evaluation.Summary}\n\n" +
                 $"[LAST_ASSESSMENT]\n{session.AssessmentText}";
 
             var learningPathJson = await _curator.ExecuteAsync(new(session.Goal, performanceBlob), ct);
@@ -85,14 +81,14 @@ namespace ReasoningAgents.Infrastructure.Services
             // _store.Remove(sessionId);
 
             return new SubmitAnswersResult(
-                Passed: passed,
-                Score: score,
-                Summary: summary,
-                Issues: issues,
-                Improvements: improvements,
-                LearningPathJson: learningPathJson,
-                StudyPlanJson: studyPlanJson
-            );
+                    Passed: evaluation.Passed,
+                    Score: evaluation.Score,
+                    Summary: evaluation.Summary,
+                    Issues: evaluation.Issues,
+                    Improvements: evaluation.Improvements,
+                    LearningPathJson: learningPathJson,
+                    StudyPlanJson: studyPlanJson
+                );
         }
 
         private static string NewSessionId()
@@ -122,13 +118,6 @@ namespace ReasoningAgents.Infrastructure.Services
             };
 
             return JsonSerializer.Serialize(slim);
-        }
-
-        private static (int Score, IReadOnlyList<string> Issues, IReadOnlyList<string> Improvements) TryExtractCriticParts(string summary)
-        {
-            // MVP: if you later change Critic to return JSON, parse that here.
-            // For now, keep it safe.
-            return (Score: 0, Issues: Array.Empty<string>(), Improvements: Array.Empty<string>());
         }
     }
 }

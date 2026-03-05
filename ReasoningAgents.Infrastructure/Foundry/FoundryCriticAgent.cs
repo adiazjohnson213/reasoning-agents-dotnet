@@ -4,13 +4,14 @@ using Azure;
 using Azure.AI.Agents.Persistent;
 using ReasoningAgents.Domain.Agents;
 using ReasoningAgents.Domain.Inputs;
+using ReasoningAgents.Domain.Models;
 using ReasoningAgents.Infrastructure.Configuration;
 using ReasoningAgents.Infrastructure.Foundry.Prompts;
 
 namespace ReasoningAgents.Infrastructure.Foundry
 {
     public sealed class FoundryCriticAgent
-        : IAgentStep<CriticInput, (bool Passed, string Summary)>
+        : IAgentStep<CriticInput, CriticEvaluation>
     {
         private readonly AgentOptions _options;
         private readonly PersistentAgentsClient _client;
@@ -21,7 +22,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
             _client = client;
         }
 
-        public async Task<(bool Passed, string Summary)> ExecuteAsync(CriticInput input,
+        public async Task<CriticEvaluation> ExecuteAsync(CriticInput input,
                                                                       CancellationToken ct)
         {
             PersistentAgent agent;
@@ -123,7 +124,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
             throw new InvalidOperationException("No agent response text was returned.");
         }
 
-        private static (bool Passed, string Summary) ParseCriticJson(string jsonText)
+        private static CriticEvaluation ParseCriticJson(string jsonText)
         {
             try
             {
@@ -141,32 +142,20 @@ namespace ReasoningAgents.Infrastructure.Foundry
 
                 var issues = TryReadStringArray(root, "issues");
                 var improvements = TryReadStringArray(root, "improvements");
-                var domain = root.TryGetProperty("domain", out var domainEl) ? (domainEl.GetString() ?? "") : "";
+                var domain = root.TryGetProperty("domain", out var domainEl)
+                    ? (domainEl.GetString() ?? "")
+                    : "";
 
                 var passed = score >= 7;
 
-                var final = new StringBuilder();
-                final.Append($"Score: {score}/10. ");
-                if (!string.IsNullOrWhiteSpace(domain))
-                    final.Append($"Domain: {domain}. ");
-                if (!string.IsNullOrWhiteSpace(summary))
-                    final.Append(summary.Trim());
-
-                if (issues.Count > 0)
-                {
-                    final.Append(" Issues: ");
-                    final.Append(string.Join(" | ", issues));
-                    final.Append('.');
-                }
-
-                if (improvements.Count > 0)
-                {
-                    final.Append(" Improvements: ");
-                    final.Append(string.Join(" | ", improvements));
-                    final.Append('.');
-                }
-
-                return (passed, final.ToString().Trim());
+                return new CriticEvaluation(
+                    Passed: passed,
+                    Score: score,
+                    Summary: summary.Trim(),
+                    Issues: issues,
+                    Improvements: improvements,
+                    Domain: string.IsNullOrWhiteSpace(domain) ? null : domain
+                );
             }
             catch (Exception ex)
             {

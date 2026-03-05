@@ -62,7 +62,7 @@ IAgentStep<CuratorInput, string> curator = new FoundryCuratorAgent(agentOptions,
 IAgentStep<PlannerInput, string> planner = new FoundryPlannerAgent(agentOptions, persistenClient);
 IAgentStep<AssessmentInput, string> assessor = !opt.IsExamMode ? domainAssessor
                                                                 : new FoundryExamAssessmentAgent(domainAssessor);
-IAgentStep<CriticInput, (bool Passed, string Summary)> critic = new FoundryCriticAgent(agentOptions, persistenClient);
+IAgentStep<CriticInput, CriticEvaluation> critic = new FoundryCriticAgent(agentOptions, persistenClient);
 
 var runner = new WorkflowRunner(preflight, curator, planner, assessor, critic);
 
@@ -100,7 +100,7 @@ Console.WriteLine($"\nPASSED: {result.Passed}");
 Console.WriteLine($"ITERATIONS: {result.Iterations}");
 Console.WriteLine();
 
-SummaryRender.PrettyPrintSummary(result.Summary);
+SummaryRender.PrettyPrintSummary(result);
 
 if (!string.IsNullOrWhiteSpace(result.StudyPlan))
 {

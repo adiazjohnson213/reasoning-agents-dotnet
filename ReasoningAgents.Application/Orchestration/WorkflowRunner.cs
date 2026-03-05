@@ -10,14 +10,14 @@ namespace ReasoningAgents.Application.Orchestration
         private readonly IAgentStep<CuratorInput, string> _curator;
         private readonly IAgentStep<PlannerInput, string> _planner;
         private readonly IAgentStep<AssessmentInput, string> _assessor;
-        private readonly IAgentStep<CriticInput, (bool Passed, string Summary)> _critic;
+        private readonly IAgentStep<CriticInput, CriticEvaluation> _critic;
 
         public WorkflowRunner(
             IAgentStep<CertificationGoal, string> preflight,
             IAgentStep<CuratorInput, string> curator,
             IAgentStep<PlannerInput, string> planner,
             IAgentStep<AssessmentInput, string> assessor,
-            IAgentStep<CriticInput, (bool Passed, string Summary)> critic)
+            IAgentStep<CriticInput, CriticEvaluation> critic)
         {
             _preflight = preflight;
             _curator = curator;
@@ -52,13 +52,16 @@ namespace ReasoningAgents.Application.Orchestration
                 var userAnswers = await getUserAnswersAsync(assessment, ct);
 
                 // 3) Critic
-                var (passed, summary) = await _critic.ExecuteAsync(new(goal, assessment, userAnswers), ct);
+                var evaluation = await _critic.ExecuteAsync(new(goal, assessment, userAnswers), ct);
 
-                if (passed)
+                if (evaluation.Passed)
                 {
                     return new WorkflowResult(
                         Passed: true,
-                        Summary: summary,
+                        Score: evaluation.Score,
+                        Summary: evaluation.Summary,
+                        Issues: evaluation.Issues,
+                        Improvements: evaluation.Improvements,
                         Iterations: iterations,
                         LearningPath: learningPath,
                         StudyPlan: studyPlan
@@ -67,7 +70,7 @@ namespace ReasoningAgents.Application.Orchestration
 
                 // 4) Curate + Plan ALWAYS on failure (even on last iteration)
                 var performanceBlob =
-                    $"[PERFORMANCE_FEEDBACK]\n{summary}\n\n" +
+                    $"[PERFORMANCE_FEEDBACK]\n{evaluation}\n\n" +
                     $"[LAST_ASSESSMENT]\n{assessment}";
 
                 learningPath = await _curator.ExecuteAsync(new(goal, performanceBlob), ct);
@@ -78,7 +81,10 @@ namespace ReasoningAgents.Application.Orchestration
                 {
                     return new WorkflowResult(
                         Passed: false,
-                        Summary: $"Failed after {iterations} iteration(s). Last evaluation: {summary}",
+                        Score: evaluation.Score,
+                        Summary: $"Failed after {iterations} iteration(s). Last evaluation: {evaluation.Summary}",
+                        Issues: evaluation.Issues,
+                        Improvements: evaluation.Improvements,
                         Iterations: iterations,
                         LearningPath: learningPath,
                         StudyPlan: studyPlan

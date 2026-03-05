@@ -39,7 +39,7 @@ builder.Services.AddTransient<IAgentStep<CertificationGoal, string>, FoundryAsse
 builder.Services.AddTransient<IAgentStep<AssessmentInput, string>, FoundryAssessmentAgent>();
 
 // Critic / Curator / Planner
-builder.Services.AddTransient<IAgentStep<CriticInput, (bool, string)>, FoundryCriticAgent>();
+builder.Services.AddTransient<IAgentStep<CriticInput, CriticEvaluation>, FoundryCriticAgent>();
 builder.Services.AddTransient<IAgentStep<CuratorInput, string>, FoundryCuratorAgent>();
 builder.Services.AddTransient<IAgentStep<PlannerInput, string>, FoundryPlannerAgent>();
 

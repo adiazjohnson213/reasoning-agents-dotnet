@@ -1,63 +1,43 @@
-﻿namespace ReasoningAgents.Console.Output
+﻿using ReasoningAgents.Domain.Models;
+
+namespace ReasoningAgents.Console.Output
 {
     public static class SummaryRender
     {
-        public static void PrettyPrintSummary(string summary)
+        public static void PrettyPrintSummary(WorkflowResult result)
         {
-            if (string.IsNullOrWhiteSpace(summary))
-            {
-                System.Console.WriteLine("(No summary)");
-                return;
-            }
-
-            var scorePart = summary;
-            var issuesPart = "";
-            var improvementsPart = "";
-
-            var issuesIndex = summary.IndexOf("Issues:", StringComparison.OrdinalIgnoreCase);
-            if (issuesIndex >= 0)
-            {
-                scorePart = summary[..issuesIndex].Trim();
-                var rest = summary[(issuesIndex + "Issues:".Length)..].Trim();
-
-                var improvementsIndex = rest.IndexOf("Improvements:", StringComparison.OrdinalIgnoreCase);
-                if (improvementsIndex >= 0)
-                {
-                    issuesPart = rest[..improvementsIndex].Trim().TrimEnd('.');
-                    improvementsPart = rest[(improvementsIndex + "Improvements:".Length)..].Trim().TrimEnd('.');
-                }
-                else
-                {
-                    issuesPart = rest.Trim().TrimEnd('.');
-                }
-            }
-
             System.Console.WriteLine("=== RESULTADO ===");
-            System.Console.WriteLine(scorePart);
+            System.Console.WriteLine($"Passed: {result.Passed}");
+            System.Console.WriteLine($"Score: {result.Score}/10");
+
+            if (!string.IsNullOrWhiteSpace(result.Summary))
+            {
+                System.Console.WriteLine();
+                System.Console.WriteLine(result.Summary.Trim());
+            }
+
             System.Console.WriteLine();
 
-            if (!string.IsNullOrWhiteSpace(issuesPart))
+            if (result.Issues is { Count: > 0 })
             {
-                System.Console.WriteLine("=== ISSUES (qué estuvo mal) ===");
-                PrintPipeList(issuesPart);
+                System.Console.WriteLine("=== ISSUES (what went wrong) ===");
+                PrintList(result.Issues);
                 System.Console.WriteLine();
             }
 
-            if (!string.IsNullOrWhiteSpace(improvementsPart))
+            if (result.Improvements is { Count: > 0 })
             {
-                System.Console.WriteLine("=== IMPROVEMENTS (qué hacer ahora) ===");
-                PrintPipeList(improvementsPart);
+                System.Console.WriteLine("=== IMPROVEMENTS (what to do now) ===");
+                PrintList(result.Improvements);
                 System.Console.WriteLine();
             }
         }
 
-        private static void PrintPipeList(string text)
+        private static void PrintList(IReadOnlyList<string> items)
         {
-            var items = text.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            for (var i = 0; i < items.Length; i++)
+            for (var i = 0; i < items.Count; i++)
             {
-                var item = items[i].Trim().TrimEnd('.');
+                var item = items[i]?.Trim().TrimEnd('.');
                 if (!string.IsNullOrWhiteSpace(item))
                     System.Console.WriteLine($"{i + 1}. {item}");
             }
