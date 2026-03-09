@@ -15,7 +15,6 @@
 
                                         SCHEMA:
                                         {
-                                          "domain": "<string>",
                                           "score": <integer 0..100>,
                                           "summary": "<string>",
                                           "issues": ["<string>", "<string>"],
@@ -35,6 +34,12 @@
                                         - Reserve 90-100 for truly exceptional answers.
                                         - Do not default to round numbers unless justified by the answer quality.
 
+                                        FORMAT RULES:
+                                        - Missing answers due to time are allowed; do NOT force score=0 for missing questions.
+                                        - SINGLE uses one letter (e.g., A).
+                                        - MULTI uses commas (e.g., A,C,D).
+                                        - REORDER uses dashes (e.g., B-D-E-F-C-A).
+
                                         Do not include "Answer:", "Correct:", or explanations outside JSON.
                                         """;
 
@@ -45,19 +50,23 @@
                                         {{assessment}}
 
                                         USER_ANSWERS (format is strict):
-                                        - Each answer MUST be provided as: Q<number>=<A|B|C|D>
-                                        - Example:
-                                          Q1=A
-                                          Q2=B
-                                          Q3=C
-                                          Q4=D
+                                        - Each answer MUST be provided as: Q<number>=<value>
+                                        - Supported <value> formats (no spaces):
+                                          1) SINGLE (one letter):              Q12=A
+                                          2) MULTI (comma-separated letters):  Q6=A,C   or Q8=A,C,D or Q20=B,C,F
+                                          3) REORDER (dash-separated letters): Q13=A-C-B-D-E or Q12=B-D-E-F-C-A
+                                        - Letters must be uppercase A–Z.
+                                        - MULTI uses commas only. REORDER uses dashes only. SINGLE uses one letter only.
+                                        - Do NOT include any other characters.
 
                                         USER_ANSWERS:
                                         {{userAnswers}}
 
                                         Instructions:
-                                        1) Parse USER_ANSWERS by question number (Q1, Q2, ...). Do NOT reorder.
-                                        2) If the format is invalid or a question is missing, set score to 0 and explain the formatting issue in "summary".
+                                        1) Parse USER_ANSWERS line-by-line by question number (Q1, Q2, ...). Do NOT reorder.
+                                        2) Missing answers due to time are allowed. Do NOT set score=0 for missing questions.
+                                        3) If any PROVIDED line has invalid format, set score=0 and explain the formatting issue in "summary".
+                                        4) If some answers are missing, mention it in "issues" and reduce score proportionally, but still score the answered ones.
 
                                         Return ONLY valid JSON (no markdown, no extra text) with this exact schema:
                                         {

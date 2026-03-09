@@ -9,7 +9,9 @@
     public sealed record QuestionDto(
         int Number,
         string Prompt,
-        IReadOnlyList<OptionDto> Options
+        IReadOnlyList<OptionDto> Options,
+        int? SelectCount,
+        string QuestionType
     );
 
     public sealed record OptionDto(

@@ -15,7 +15,7 @@ namespace ReasoningAgents.Infrastructure.Foundry
 
         // MCP config
         private const string McpServerLabel = "microsoft_learn";
-        private const string McpServerUrl = "https://learn.microsoft.com/api/mcp";
+        private const string McpServerUrl = "https://learn.microsoft.com/api/mcp?maxTokenBudget=2000";
 
         public FoundryAssessmentPreflightAgent(AgentOptions options, PersistentAgentsClient client)
         {
